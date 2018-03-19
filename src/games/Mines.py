@@ -3,16 +3,24 @@ import enum
 import functools
 
 
-class Config(enum.Enum):
-    width = 16
-    height = 8
-    mines = 20
+class Config():
+    def __init__(self, ex={}):
+        self.width = 16
+        self.height = 8
+        self.mines = 15
+
+        for k, v in ex.items():
+            setattr(self, k, v)
+
+    def __str__(self):
+        return 'width: {}\nheight: {}\nmines: {}\n'.format(self.width, self.height, self.mines)
 
 
 class Mines():
     def __init__(self, ex={}):
         self.state = 'initialized'
         self.debug = False
+        self.config = Config()
 
         for k, v in ex.items():
             setattr(self, k, v)
@@ -32,7 +40,7 @@ class Mines():
         tmp = []
         for d in directions:
             cur = [pos[0]+d[0], pos[1]+d[1]]
-            if cur[0] in range(Config.width.value) and cur[1] in range(Config.height.value):
+            if cur[0] in range(self.config.width) and cur[1] in range(self.config.height):
                 tmp.append(cur)
 
         return tmp
@@ -54,16 +62,16 @@ class Mines():
     @_state(['initialized', 'finished'])
     def set_(self):
         self.field = [
-            ['.' for i in range(Config.height.value)]
-            for i in range(Config.width.value)]
+            ['.' for i in range(self.config.height)]
+            for i in range(self.config.width)]
         self.view = [
-            ['#' for i in range(Config.height.value)]
-            for i in range(Config.width.value)]
+            ['#' for i in range(self.config.height)]
+            for i in range(self.config.width)]
 
-        cnt = Config.mines.value
+        cnt = self.config.mines
         while cnt != 0:
-            x = random.randint(0, Config.width.value - 1)
-            y = random.randint(0, Config.height.value - 1)
+            x = random.randint(0, self.config.width - 1)
+            y = random.randint(0, self.config.height - 1)
             if self.field[x][y] == '.':
                 self.field[x][y] = 'm'
                 cnt -= 1
@@ -75,11 +83,11 @@ class Mines():
     @_state(['setted', 'running', 'finished'])
     def plot(self):
         tmp = '\\' + ''.join(
-                ['{:X}'.format(i)for i in range(Config.width.value)]
+                ['{:X}'.format(i)for i in range(self.config.width)]
             ) + '\n'
-        for j in range(0, Config.height.value):
+        for j in range(0, self.config.height):
             tmp += '{:X}'.format(j)
-            for i in range(0, Config.width.value):
+            for i in range(0, self.config.width):
                 tmp += self.view[i][j]
                 if self.state == 'finished':
                     if self.field[i][j] == 'm':
@@ -134,16 +142,30 @@ class Mines():
             for i in tmp:
                 self._open_(i)
 
+    def dinfo(self):
+        return 'config: {{{}}}\nstate: {}\n'.format(
+            str(self.config)[:-1].replace('\n', ', '),
+            self.state
+        )
+
+    def __str__(self):
+        if self.debug:
+            return self.plot()[1] + self.dinfo()
+        else:
+            return self.plot()[1]
+
 
 def main():
     random.seed()
-    game = Mines()
+    game = Mines({'config': Config({'mines': 10}), 'debug': True})
+
     while True:
         game.set_()
 
         while True:
-            tmp = game.plot()
-            print(tmp[1], end='')
+            print(game)
+            # tmp = game.plot()
+            # print(tmp[1], end='')
             tmp = list(map(int, input('>> ').split(',')))
             tmp = game.open_(tmp)
             if tmp[0] == 1:
