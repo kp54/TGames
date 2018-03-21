@@ -3,6 +3,13 @@ import enum
 import functools
 
 
+class enumStatus(enum.Enum):
+    initialized = enum.auto()
+    setted = enum.auto()
+    running = enum.auto()
+    finished = enum.auto()
+
+
 class Config():
     def __init__(self, ex={}):
         self.width = 16
@@ -18,7 +25,7 @@ class Config():
 
 class Mines():
     def __init__(self, ex={}):
-        self.state = 'initialized'
+        self.state = enumStatus.initialized
         self.debug = False
         self.config = Config()
 
@@ -45,7 +52,7 @@ class Mines():
 
         return tmp
 
-    def _state(status):
+    def _state(*status):
         def _state_(func):
             @functools.wraps(func)
             def wrapper(self, *args, **kwargs):
@@ -59,7 +66,7 @@ class Mines():
             return wrapper
         return _state_
 
-    @_state(['initialized', 'finished'])
+    @_state(enumStatus.initialized, enumStatus.finished)
     def set_(self):
         self.field = [
             ['.' for i in range(self.config.height)]
@@ -76,11 +83,11 @@ class Mines():
                 self.field[x][y] = 'm'
                 cnt -= 1
 
-        self.state = 'setted'
+        self.state = enumStatus.setted
 
         return (0,)
 
-    @_state(['setted', 'running', 'finished'])
+    @_state(enumStatus.setted, enumStatus.running, enumStatus.finished)
     def plot(self):
         tmp = '\\' + ''.join(
                 ['{:X}'.format(i)for i in range(self.config.width)]
@@ -89,7 +96,7 @@ class Mines():
             tmp += '{:X}'.format(j)
             for i in range(0, self.config.width):
                 tmp += self.view[i][j]
-                if self.state == 'finished':
+                if self.state == enumStatus.finished:
                     if self.field[i][j] == 'm':
                         if self.view[i][j] == 'f':
                             tmp = tmp[:-1] + 'x'
@@ -101,10 +108,10 @@ class Mines():
             0,
             tmp)
 
-    @_state(['setted', 'running'])
+    @_state(enumStatus.setted, enumStatus.running)
     def open_(self, pos):
-        if self.state == 'setted':
-            self.state = 'running'
+        if self.state == enumStatus.setted:
+            self.state = enumStatus.running
 
         if self.view[pos[0]][pos[1]] != '#':
             return (
@@ -112,7 +119,7 @@ class Mines():
                 'already opened')
 
         elif self.field[pos[0]][pos[1]] == 'm':
-            self.state = 'finished'
+            self.state = enumStatus.finished
 
             return (
                 1,
@@ -145,7 +152,7 @@ class Mines():
     def dinfo(self):
         return 'config: {{{}}}\nstate: {}\n'.format(
             str(self.config)[:-1].replace('\n', ', '),
-            self.state
+            self.state.name
         )
 
     def __str__(self):
@@ -164,8 +171,6 @@ def main():
 
         while True:
             print(game)
-            # tmp = game.plot()
-            # print(tmp[1], end='')
             tmp = list(map(int, input('>> ').split(',')))
             tmp = game.open_(tmp)
             if tmp[0] == 1:
