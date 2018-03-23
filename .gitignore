@@ -1,10 +1,6 @@
 *__pycache__*
 
 /.vscode
-/bin
-/include
-/lib
-/share
-/pip-selfcheck.json
+/venv
 
 /src/proto
