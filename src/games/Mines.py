@@ -2,39 +2,13 @@ import random
 import enum
 import functools
 
-
-def clamp(value, min_, max_):
-    return sorted(min_, value, max_)[1]
-
-
-class enumStatus(enum.Enum):
-    initialized = enum.auto()
-    setted = enum.auto()
-    running = enum.auto()
-    finished = enum.auto()
+from ..config.Mines import Config
+from .GameBase import GameBase, EnumStatus, state
 
 
-class Config():
-    def __init__(self, width=16, height=8, mines=15, extra={}):
-        self.width = clamp(width, 0, 15)
-        self.height = clamp(height, 0, 15)
-        self.mines = clamp(mines, 0, int(self.width*self.height*0.9))
-
-        for k, v in extra.items():
-            setattr(self, k, v)
-
-    def __str__(self):
-        return 'width: {}\nheight: {}\nmines: {}\n'.format(self.width, self.height, self.mines)
-
-
-class Mines():
+class Mines(GameBase):
     def __init__(self, config=Config(), debug=False, extra={}):
-        self.state = enumStatus.initialized
-        self.debug = debug
-        self.config = config
-
-        for k, v in extra.items():
-            setattr(self, k, v)
+        super().__init__(config, debug, extra)
 
     def _adjs(self, pos):
         directions = (
@@ -56,28 +30,10 @@ class Mines():
 
         return tmp
 
-    def _state(*status):
-        def _state_(func):
-            @functools.wraps(func)
-            def wrapper(self, *args, **kwargs):
-                if self.state in status:
-                    return func(self, *args, **kwargs)
-                else:
-                    return (
-                        -1,
-                        'sequence error')
-
-            return wrapper
-        return _state_
-
-    @_state(enumStatus.initialized, enumStatus.finished)
+    @state(EnumStatus.stopped)
     def set_(self):
-        self.field = [
-            ['.' for i in range(self.config.height)]
-            for i in range(self.config.width)]
-        self.view = [
-            ['#' for i in range(self.config.height)]
-            for i in range(self.config.width)]
+        self.field = [['.' for i in range(self.config.height)] for i in range(self.config.width)]
+        self.view = [['#' for i in range(self.config.height)] for i in range(self.config.width)]
 
         cnt = self.config.mines
         while cnt != 0:
@@ -87,11 +43,11 @@ class Mines():
                 self.field[x][y] = 'm'
                 cnt -= 1
 
-        self.state = enumStatus.setted
+        self.state = EnumStatus.ready
 
         return (0,)
 
-    @_state(enumStatus.setted, enumStatus.running, enumStatus.finished)
+    @state(EnumStatus.ready, EnumStatus.running, EnumStatus.stopped)
     def plot(self):
         tmp = '\\' + ''.join(
                 ['{:X}'.format(i)for i in range(self.config.width)]
@@ -100,7 +56,7 @@ class Mines():
             tmp += '{:X}'.format(j)
             for i in range(self.config.width):
                 tmp += self.view[i][j]
-                if self.state is enumStatus.finished:
+                if self.state is EnumStatus.stopped:
                     if self.field[i][j] == 'm':
                         if self.view[i][j] == 'f':
                             tmp = tmp[:-1] + 'x'
@@ -112,10 +68,10 @@ class Mines():
             0,
             tmp)
 
-    @_state(enumStatus.setted, enumStatus.running)
+    @state(EnumStatus.ready, EnumStatus.running)
     def open_(self, pos):
-        if self.state is enumStatus.setted:
-            self.state = enumStatus.running
+        if self.state is EnumStatus.ready:
+            self.state = EnumStatus.running
 
         if self.view[pos[0]][pos[1]] != '#':
             return (
@@ -123,13 +79,15 @@ class Mines():
                 'already opened')
 
         elif self.field[pos[0]][pos[1]] == 'm':
-            self.state = enumStatus.finished
+            self.state = EnumStatus.stopped
 
             return (
                 1,
                 'BOOM!')
 
         else:
+            if self.debug:
+                print('scanning:')
             self._open_(pos)
             return (0,)
 
@@ -153,7 +111,7 @@ class Mines():
             for i in tmp:
                 self._open_(i)
 
-    @_state(enumStatus.initialized, enumStatus.setted, enumStatus.running, enumStatus.finished)
+    @state(EnumStatus.ready, EnumStatus.running, EnumStatus.stopped)
     def dinfo(self):
         return 'config: {{{}}}\nstate: {}\n'.format(
             str(self.config)[:-1].replace('\n', ', '),
@@ -165,34 +123,3 @@ class Mines():
             return self.plot()[1] + self.dinfo()
         else:
             return self.plot()[1]
-
-
-def main():
-    random.seed()
-    game = Mines(config=Config(mines=10), debug=True)
-
-    while True:
-        game.set_()
-
-        while True:
-            print(game)
-            tmp = list(map(lambda x: int(x, base=16), input('>> ').split(',')))
-            tmp = game.open_(tmp)
-            if tmp[0] == 1:
-                print('BOOM!')
-                break
-
-        tmp = game.plot()
-        print(tmp[1], end='')
-
-        while True:
-            tmp = input('contine?: ')
-            if tmp in ('yes', 'no'):
-                break
-
-        if tmp == 'no':
-            break
-
-
-if __name__ == '__main__':
-    main()
