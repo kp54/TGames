@@ -3,6 +3,10 @@ import enum
 import functools
 
 
+def clamp(value, min_, max_):
+    return sorted(min_, value, max_)[1]
+
+
 class enumStatus(enum.Enum):
     initialized = enum.auto()
     setted = enum.auto()
@@ -11,12 +15,12 @@ class enumStatus(enum.Enum):
 
 
 class Config():
-    def __init__(self, ex={}):
-        self.width = 16
-        self.height = 8
-        self.mines = 15
+    def __init__(self, width=16, height=8, mines=15, extra={}):
+        self.width = clamp(width, 0, 15)
+        self.height = clamp(height, 0, 15)
+        self.mines = clamp(mines, 0, int(self.width*self.height*0.9))
 
-        for k, v in ex.items():
+        for k, v in extra.items():
             setattr(self, k, v)
 
     def __str__(self):
@@ -24,29 +28,29 @@ class Config():
 
 
 class Mines():
-    def __init__(self, ex={}):
+    def __init__(self, config=Config(), debug=False, extra={}):
         self.state = enumStatus.initialized
-        self.debug = False
-        self.config = Config()
+        self.debug = debug
+        self.config = config
 
-        for k, v in ex.items():
+        for k, v in extra.items():
             setattr(self, k, v)
 
     def _adjs(self, pos):
-        directions = [
-            [1, 0],
-            [1, -1],
-            [0, -1],
-            [-1, -1],
-            [-1, 0],
-            [-1, 1],
-            [0, 1],
-            [1, 1]
-        ]
+        directions = (
+            (1, 0),
+            (1, -1),
+            (0, -1),
+            (-1, -1),
+            (-1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1)
+        )
 
         tmp = []
         for d in directions:
-            cur = [pos[0]+d[0], pos[1]+d[1]]
+            cur = (pos[0]+d[0], pos[1]+d[1])
             if cur[0] in range(self.config.width) and cur[1] in range(self.config.height):
                 tmp.append(cur)
 
@@ -92,11 +96,11 @@ class Mines():
         tmp = '\\' + ''.join(
                 ['{:X}'.format(i)for i in range(self.config.width)]
             ) + '\n'
-        for j in range(0, self.config.height):
+        for j in range(self.config.height):
             tmp += '{:X}'.format(j)
-            for i in range(0, self.config.width):
+            for i in range(self.config.width):
                 tmp += self.view[i][j]
-                if self.state == enumStatus.finished:
+                if self.state is enumStatus.finished:
                     if self.field[i][j] == 'm':
                         if self.view[i][j] == 'f':
                             tmp = tmp[:-1] + 'x'
@@ -110,7 +114,7 @@ class Mines():
 
     @_state(enumStatus.setted, enumStatus.running)
     def open_(self, pos):
-        if self.state == enumStatus.setted:
+        if self.state is enumStatus.setted:
             self.state = enumStatus.running
 
         if self.view[pos[0]][pos[1]] != '#':
@@ -149,6 +153,7 @@ class Mines():
             for i in tmp:
                 self._open_(i)
 
+    @_state(enumStatus.initialized, enumStatus.setted, enumStatus.running, enumStatus.finished)
     def dinfo(self):
         return 'config: {{{}}}\nstate: {}\n'.format(
             str(self.config)[:-1].replace('\n', ', '),
@@ -164,14 +169,14 @@ class Mines():
 
 def main():
     random.seed()
-    game = Mines({'config': Config({'mines': 10}), 'debug': True})
+    game = Mines(config=Config(mines=10), debug=True)
 
     while True:
         game.set_()
 
         while True:
             print(game)
-            tmp = list(map(int, input('>> ').split(',')))
+            tmp = list(map(lambda x: int(x, base=16), input('>> ').split(',')))
             tmp = game.open_(tmp)
             if tmp[0] == 1:
                 print('BOOM!')
@@ -182,7 +187,7 @@ def main():
 
         while True:
             tmp = input('contine?: ')
-            if tmp in ['yes', 'no']:
+            if tmp in ('yes', 'no'):
                 break
 
         if tmp == 'no':
