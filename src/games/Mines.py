@@ -1,6 +1,4 @@
 import random
-import enum
-import functools
 
 from ..config.Mines import Config
 from .GameBase import GameBase, EnumStatus, state
@@ -43,25 +41,33 @@ class Mines(GameBase):
                 self.field[x][y] = 'm'
                 cnt -= 1
 
+        for i in range(self.config.width):
+            for j in range(self.config.height):
+                if self.field[i][j] != 'm':
+                    cnt = 0
+                    for p in self._adjs((i, j)):
+                        if self.field[p[0]][p[1]] == 'm':
+                            cnt += 1
+                    if cnt != 0:
+                        self.field[i][j] = str(cnt)
+
         self.state = EnumStatus.ready
 
         return (0,)
 
     @state(EnumStatus.ready, EnumStatus.running, EnumStatus.stopped)
     def plot(self):
-        tmp = '\\' + ''.join(
-                ['{:X}'.format(i)for i in range(self.config.width)]
-            ) + '\n'
+        tmp = '\\' + ''.join('{:X}'.format(i)for i in range(self.config.width)) + '\n'
         for j in range(self.config.height):
             tmp += '{:X}'.format(j)
             for i in range(self.config.width):
-                tmp += self.view[i][j]
+                tmp += self.view[i][j] or self.field[i][j]
                 if self.state is EnumStatus.stopped:
                     if self.field[i][j] == 'm':
                         if self.view[i][j] == 'f':
-                            tmp = tmp[:-1] + 'x'
+                            tmp = tmp[:-1]+'x'
                         else:
-                            tmp = tmp[:-1] + 'm'
+                            tmp = tmp[:-1]+'m'
             tmp += '\n'
 
         return (
@@ -73,7 +79,7 @@ class Mines(GameBase):
         if self.state is EnumStatus.ready:
             self.state = EnumStatus.running
 
-        if self.view[pos[0]][pos[1]] != '#':
+        if self.view[pos[0]][pos[1]] is None:
             return (
                 -2,
                 'already opened')
@@ -88,35 +94,46 @@ class Mines(GameBase):
         else:
             if self.debug:
                 print('scanning:')
-            self._open_(pos)
+            queue = [pos]
+            visited = []
+            while queue:
+                tmp = queue.pop(0)
+                if str(tmp) in visited:
+                    continue
+                if self.debug:
+                    print(tmp)
+                visited.append(str(tmp))
+                if self.view[tmp[0]][tmp[1]] != '#':
+                    continue
+                self.view[tmp[0]][tmp[1]] = None
+                if self.field[tmp[0]][tmp[1]] == '.':
+                    queue.extend(self._adjs(tmp))
             return (0,)
 
-    def _open_(self, pos):
-        if self.view[pos[0]][pos[1]] != '#':
-            return
-
-        if self.debug:
-            print(pos)
-
-        cnt = 0
-        tmp = self._adjs(pos)
-        for i in tmp:
-            if self.field[i[0]][i[1]] == 'm':
-                cnt += 1
-
-        if cnt != 0:
-            self.view[pos[0]][pos[1]] = str(cnt)
-        else:
-            self.view[pos[0]][pos[1]] = '.'
-            for i in tmp:
-                self._open_(i)
-
-    @state(EnumStatus.ready, EnumStatus.running, EnumStatus.stopped)
     def dinfo(self):
-        return 'config: {{{}}}\nstate: {}\n'.format(
+        return 'config: {{{}}}\nstate: {}\n{}'.format(
             str(self.config)[:-1].replace('\n', ', '),
-            self.state.name
+            self.state.name,
+            self.dplot()
         )
+
+    def dplot(self):
+        tmp = 'field:\n'
+        tmp += '\\' + ''.join('{:X}'.format(i)for i in range(self.config.width)) + '\n'
+        for j in range(self.config.height):
+            tmp += '{:X}'.format(j)
+            for i in range(self.config.width):
+                tmp += self.field[i][j]
+            tmp += '\n'
+        tmp += 'view:\n'
+        tmp += '\\' + ''.join('{:X}'.format(i)for i in range(self.config.width)) + '\n'
+        for j in range(self.config.height):
+            tmp += '{:X}'.format(j)
+            for i in range(self.config.width):
+                tmp += self.view[i][j] or ' '
+            tmp += '\n'
+
+        return tmp
 
     def __str__(self):
         if self.debug:
