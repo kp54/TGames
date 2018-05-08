@@ -7,6 +7,7 @@ from .GameBase import GameBase, EnumStatus, state
 class Mines(GameBase):
     def __init__(self, config=Config(), debug=False, extra={}):
         super().__init__(config, debug, extra)
+        self.count = 0
 
     def _adjs(self, pos):
         directions = (
@@ -51,6 +52,8 @@ class Mines(GameBase):
                     if cnt != 0:
                         self.field[i][j] = str(cnt)
 
+        self.count = self.config.width * self.config.height - self.config.mines
+
         self.state = EnumStatus.ready
 
         return (0,)
@@ -64,11 +67,13 @@ class Mines(GameBase):
                 tmp += self.view[i][j] or self.field[i][j]
                 if self.state is EnumStatus.stopped:
                     if self.field[i][j] == 'm':
-                        if self.view[i][j] == 'f':
+                        if self.view[i][j] == 'F':
                             tmp = tmp[:-1]+'x'
                         else:
                             tmp = tmp[:-1]+'m'
             tmp += '\n'
+
+        self.logger.debug(self.dinfo())
 
         return (
             0,
@@ -80,35 +85,66 @@ class Mines(GameBase):
             self.state = EnumStatus.running
 
         if self.view[pos[0]][pos[1]] is None:
-            return (
-                -2,
-                'already opened')
-
-        elif self.field[pos[0]][pos[1]] == 'm':
-            self.state = EnumStatus.stopped
-
-            return (
-                1,
-                'BOOM!')
-
+            if self.field[pos[0]][pos[1]] not in ['.', 'm']:
+                if int(self.field[pos[0]][pos[1]]) == sum(1 if self.view[p[0]][p[1]] == 'F' else 0 for p in self._adjs(pos)):
+                    for p in self._adjs(pos):
+                        if self.view[p[0]][p[1]] == '#':
+                            tmp = self.open_(p)
+                            if tmp[0] != 0:
+                                return tmp
+                else:
+                    return (
+                        -1,
+                        'already opened')
         else:
-            if self.debug:
-                print('scanning:')
-            queue = [pos]
-            visited = []
-            while queue:
-                tmp = queue.pop(0)
-                if str(tmp) in visited:
-                    continue
-                if self.debug:
-                    print(tmp)
-                visited.append(str(tmp))
-                if self.view[tmp[0]][tmp[1]] != '#':
-                    continue
-                self.view[tmp[0]][tmp[1]] = None
-                if self.field[tmp[0]][tmp[1]] == '.':
-                    queue.extend(self._adjs(tmp))
+            if self.view[pos[0]][pos[1]] == 'F':
+                return (
+                    -1,
+                    'flagged')
+
+            elif self.field[pos[0]][pos[1]] == 'm':
+                self.state = EnumStatus.stopped
+
+                return (
+                    1,
+                    'BOOM!')
+
+            else:
+                self.logger.debug('scanning:')
+                queue = [pos]
+                visited = []
+                while queue:
+                    tmp = queue.pop(0)
+                    if str(tmp) in visited:
+                        continue
+                    self.logger.debug(tmp)
+                    visited.append(str(tmp))
+                    if self.view[tmp[0]][tmp[1]] is None or (self.view[tmp[0]][tmp[1]] == 'F' and self.field[tmp[0]][tmp[1]] == 'm'):
+                            continue
+                    self.view[tmp[0]][tmp[1]] = None
+                    self.count -= 1
+                    if self.field[tmp[0]][tmp[1]] == '.':
+                        queue.extend(self._adjs(tmp))
+
+        if self.count == 0:
+            self.state = EnumStatus.stopped
+            return (
+                2,
+                'game cleard!')
+        else:
             return (0,)
+
+    @state(EnumStatus.running)
+    def flag(self, pos):
+        if self.view[pos[0]][pos[1]] not in ['#', 'F']:
+            return (
+                -1,
+                'not flaggable')
+        if self.view[pos[0]][pos[1]] == '#':
+            self.view[pos[0]][pos[1]] = 'F'
+        else:
+            self.view[pos[0]][pos[1]] = '#'
+        return (0,)
 
     def dinfo(self):
         return 'config: {{{}}}\nstate: {}\n{}'.format(
@@ -134,9 +170,3 @@ class Mines(GameBase):
             tmp += '\n'
 
         return tmp
-
-    def __str__(self):
-        if self.debug:
-            return self.plot()[1] + self.dinfo()
-        else:
-            return self.plot()[1]

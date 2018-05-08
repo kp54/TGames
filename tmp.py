@@ -12,15 +12,18 @@ def main():
         game.set_()
 
         while True:
-            print(game, end='')
-            tmp = (*map(lambda x: int(x, base=16), input('>> ').split(',')),)
-            tmp = game.open_(tmp)
-            if tmp[0] == 1:
-                print('BOOM!')
-                break
-
-        tmp = game.plot()
-        print(tmp[1], end='')
+            print(game.plot()[1], end='')
+            c, *tmp = input('>> ').split(',')
+            tmp = (*map(lambda x: int(x, base=16), tmp),)
+            if c == 'o':
+                tmp = game.open_(tmp)
+            elif c == 'f':
+                tmp = game.flag(tmp)
+            if tmp[0] != 0:
+                print(tmp[1])
+                if 0 < tmp[0]:
+                    break
+        print(game.plot()[1], end='')
 
         while True:
             tmp = input('contine?: ')

@@ -1,12 +1,14 @@
 import enum
 import functools
+import logging
 
 
 class GameBase():
     def __init__(self, config=None, debug=False, extra={}):
         self.state = EnumStatus.stopped
-        self.debug = debug
         self.config = config
+        self.logger = logging.getLogger(__name__)
+        self.logger.debug('Initialized')
 
         for k, v in extra.items():
             setattr(self, k, v)
