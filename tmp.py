@@ -1,5 +1,6 @@
 import random
 
+import src.util as util
 from src.games.Mines import Mines
 from src.config.Mines import Config
 
@@ -25,14 +26,11 @@ def main():
                     break
         print(game.plot()[1], end='')
 
-        while True:
-            tmp = input('contine?: ')
-            if tmp in ('yes', 'no'):
-                break
-
-        if tmp == 'no':
+        if not util.yn('continue?: '):
             break
 
 
 if __name__ == '__main__':
-    main()
+    import sys
+
+    sys.exit(main())
